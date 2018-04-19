@@ -35,3 +35,5 @@ beeswarm(Age~KL, data= GiveN_subset, subset= GiveN_subset$Group_4cat=='English E
 beeswarm(Age~KL, data= GiveN_subset, subset= GiveN_subset$Group_4cat=='English Later', pch=16, col=rainbow((7)), xlab = "Give-N Small Knower Level", ylab= "Age", main="Knower Level by Age: 'English Later' Group")
 beeswarm(Age~KL, data= GiveN_subset, subset= GiveN_subset$Group_4cat=='ASL Early', pch=16, col=rainbow((7)), xlab = "Give-N Small Knower Level", ylab= "Age", main="Knower Level by Age: 'ASL Early' Group")
 beeswarm(Age~KL, data= GiveN_subset, subset= GiveN_subset$Group_4cat=='ASL Later', pch=16, col=rainbow((7)), xlab = "Give-N Small Knower Level", ylab= "Age", main="Knower Level by Age: 'ASL Later' Group")
+
+# NEXT THING TO CHANGE HERE IS COLORS APPLIED TO SPECIFIC KNOWER-LEVELS (so 0 is always red, for instance)
