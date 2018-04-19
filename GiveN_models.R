@@ -27,3 +27,11 @@ p + facet_wrap(~GiveN_subset$Group_4cat) #facet_wrap doesn't work with assigned 
 
 cor.test(Age, KL)
 cor.test(Age, KL)
+
+#BEESWARM PLOTS!!!  Spectacular data visualization for GiveN data by Age
+
+library(beeswarm)
+beeswarm(Age~KL, data= GiveN_subset, subset= GiveN_subset$Group_4cat=='English Early', pch=16, col=rainbow((7)), xlab = "Give-N Small Knower Level", ylab= "Age", main="Knower Level by Age: 'English Early' Group")
+beeswarm(Age~KL, data= GiveN_subset, subset= GiveN_subset$Group_4cat=='English Later', pch=16, col=rainbow((7)), xlab = "Give-N Small Knower Level", ylab= "Age", main="Knower Level by Age: 'English Later' Group")
+beeswarm(Age~KL, data= GiveN_subset, subset= GiveN_subset$Group_4cat=='ASL Early', pch=16, col=rainbow((7)), xlab = "Give-N Small Knower Level", ylab= "Age", main="Knower Level by Age: 'ASL Early' Group")
+beeswarm(Age~KL, data= GiveN_subset, subset= GiveN_subset$Group_4cat=='ASL Later', pch=16, col=rainbow((7)), xlab = "Give-N Small Knower Level", ylab= "Age", main="Knower Level by Age: 'ASL Later' Group")
