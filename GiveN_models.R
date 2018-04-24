@@ -5,7 +5,7 @@ library("colorspace")
 
 #Check and then set working dir
 #getwd()
-setwd("/Volumes/YARN STASH/Dropbox/SLAM - Number Project/SLAM Analysis/GiveN_AB")
+#setwd([filepath])
 
 GiveN <- read.csv("GiveN_Coding_180405_AB.csv") #import the data file (which I already saved as a csv)
 View(GiveN)
