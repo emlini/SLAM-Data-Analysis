@@ -1,3 +1,5 @@
+THIS REPOSITORY IS DEFUNCT AS OF JAN 18 2021 - see new SLaM Analyses Repositoy for updated code
+
 # SLAM-Data-Analysis
 
 Analysis files for SLAM project--details about the project can be found here: https://slam.uconn.edu
