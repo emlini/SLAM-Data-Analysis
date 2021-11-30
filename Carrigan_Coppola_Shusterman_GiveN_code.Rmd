@@ -1,5 +1,24 @@
 
-#last edited Nov 30 2021 (response to Reviewers)
+---
+title: Language Not Auditory Experience is Related to Parent-Reported Executive Functioning
+  in Preschool-Aged Deaf and Hard of Hearing Children
+author:
+- Corina Coodwin, Ph.D.
+- Emily Carrigan, Ph.D. (code author)
+- Kristin Walker
+- Marie Coppola, Ph.D
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+    toc_float: yes
+  word_document:
+    toc: yes
+---
+
+Code last edited Nov 30 2021 (response to Reviewers)
 
 ```{r}
 library(tidyverse) 

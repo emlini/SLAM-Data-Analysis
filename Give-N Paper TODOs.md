@@ -9,4 +9,8 @@
 * Do an analysis of how far off kids are in quantity they give (absolute value) 
     * Maybe a plot like in Spaepen et al (Requested vs Given) and calculate R^2 value, separated by Timing
     * Are early-exposed kids more on-target than Later-exposed kids
+<<<<<<< HEAD
 * Add Coding & Analysis sub-section to Methods, and make Results match this (for Give-N Small and Give-N Large)
+=======
+* Add Coding & Analysis sub-section to Methods, and make Results match this
+>>>>>>> 6cd02fc48c5e35836656c5b66667aa1627c4aa53
