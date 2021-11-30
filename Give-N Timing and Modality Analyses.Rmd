@@ -98,12 +98,16 @@ prop.table(table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Timing))
 summary(GiveN_subset$Language_Timing)
 table(GiveN_subset$Language_Timing, GiveN_subset$GN_sm_2cat, useNA = "always")
 jitter <- position_jitter(width=0, height=0.075)
+
 #N for code below is: summary() values - NA values from table()
 a <- ggplot(data=GiveN_subset, mapping = aes(x=GN_sm_2cat, y=Age)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=Language_Timing, color=Language_Timing), method = "dotdensity", binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=11), axis.title.x=element_blank(), legend.position = c(0.8, 0.2))  + ylab("Age (Years)") + scale_fill_manual(name = "Language\nTiming", breaks=c("Later", "Early"), values=c("firebrick3", "grey37"), labels=c("Later (83)", "Early (93)")) + scale_color_manual(name = "Language\nTiming", breaks=c("Later", "Early"), values=c("firebrick3", "grey37"), labels=c("Later (83)", "Early (93)"))
+
 summary(GiveN_subset$Language_Modality)
 table(GiveN_subset$Language_Modality, GiveN_subset$GN_sm_2cat, useNA = "always")
+
 #N for code below is: summary() values - NA values from table()
 b <- ggplot(data=GiveN_subset, mapping = aes(x=GN_sm_2cat, y=Age)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=Language_Modality, color=Language_Modality), binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=10), axis.title.x=element_blank(), legend.position = c(0.8, 0.2))  + ylab("Age (Years)") + scale_fill_manual(name = "Language Modality", values=c("tan2", "forestgreen"), breaks=c("English", "ASL"), labels=c("English (105)", "ASL (71)")) + scale_color_manual(name = "Language Modality", values=c("tan2", "forestgreen"), breaks=c("English", "ASL"), labels=c("English (105)", "ASL (71)"))
+
 ggarrange(a, b, ncol=2, nrow=1, common.legend = FALSE)
 ```
 
