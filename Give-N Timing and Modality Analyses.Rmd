@@ -19,9 +19,10 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Code last edited Nov 30 2021 (response to Reviewers)
+Code last edited February 8 2022 (as part of response to Reviewers)
 
-```{r}
+#Load required packages
+```{r echo=TRUE, results='hide'}
 library(tidyverse) 
 library(ggplot2)
 library(colorspace)
@@ -30,42 +31,57 @@ library(MASS) # for polr function (ordinal logistic regression)
 library(generalhoslem) # for testing model fit (lipsitz test and two others)
 library(sure) # package for calculating residuals for ordinal logistic regression (https://journal.r-project.org/archive/2018/RJ-2018-004/RJ-2018-004.pdf)
 library(sjmisc) # for easy recoding of variables
+library(kableExtra)
+library(lmtest)
 library(broom)
 library(beeswarm)
+library(ggbeeswarm)
+library(ggpubr)
+library(table1)
 library(VGAM)
+library(forcats)
 ```
 
+# Data Preparation
 
-
-
-## Import File & View Summary Characteristics
-```{r}
-#setwd("") ##this should be wherever your file is saved 
-
-GiveN <- read.csv("GN_Smsummary_Lgall_200304.csv", na.strings = c("N/A", "I/R", "", "TBD", "N/R"))
+## Set working directory (this should be wherever your file is saved) & Import data file
+```{r echo=FALSE, results='hide'}
+#setwd("") 
+#setwd("/Users/emilycarrigan/Dropbox/Data Analysis Work/")
+GiveN <- read.csv("GN_Smsummary_Lgall_KW_201106.csv", na.strings = c("N/A", "I/R", "", "TBD", "N/R"))
 View(GiveN)
+```
 
+## Subset data
+```{r results='hide'}
 GiveN_subset <- subset(GiveN, GiveN$Including.in.Study.=='Yes' & GiveN$Including_GiveN.=='Yes' & GiveN$GN_All_Ceiling_Conservative!='' & GiveN$SES..8.66.!='') # some participant IDs in data file never tested, not tested on this task, or missing demographic data
 View(GiveN_subset)
-
 str(GiveN_subset) # check the data
 summary(GiveN_subset) # check missing values for  variables
-
 ```
 
 
-## Data Cleaning/Organization
-
+## Organize/create relevant variables
 ```{r}
 #ORDER Language Groups the way I want them
 GiveN_subset$LanguageGroup <- as.factor(factor(as.character(GiveN_subset$Group_4cat), levels = c("English Early", "ASL Early", "English Later", "ASL Later"), exclude=NA))
+
 ##Create Modality and Timing variables and add to dataframe
 GiveN_subset$Language_Modality <- factor(ifelse(GiveN_subset$Group_4cat == "English Early" | GiveN_subset$Group_4cat == "English Later", "English", "ASL"), levels = c("English", "ASL"))
 
-GiveN_subset$Language_Timing <- factor(as.character(GiveN_subset$Group_2cat), levels = c("Later", "Early"), exclude="") 
+GiveN_subset$Language_Timing <- factor(as.character(GiveN_subset$Group_2cat), levels = c("Early", "Later"), exclude="") 
 
 #CHECK whether any participants' "Language Tested" for a particular task does not match their Language_Modality group
 GiveN_subset$Language_Match <- ifelse(as.character(GiveN_subset$Child_LanguageTested) == as.character(GiveN_subset$Language_Modality), "Match", "NOT MATCH")
+
+#Convert Age of Language Exposure (currently in months) into years
+GiveN_subset$AgeofLangExp_years <- GiveN_subset$Age.of.Exposure..mo./12
+
+#Recode Race to have fewer categories
+GiveN_subset$Race_recoded <- dplyr::recode(as.character(GiveN_subset$Race), 'Asian' = "Asian", 'Black or African American'="Black or African American", 'Mixed'="More than one", 'Other'="Not Listed/Missing", 'Unsure, or prefer not to answer' = "Not Listed/Missing", 'White'="White", .missing="Not Listed/Missing")
+
+#Recode Ethnicity to have fewer categories
+GiveN_subset$Ethnicity_recoded <- dplyr::recode(as.character(GiveN_subset$Ethnicity), 'Hispanic or Latino' = "Hispanic or Latino", 'Not Hispanic or Latino'="Not Hispanic or Latino", 'Prefer not to answer'="Prefer not to answer/Missing", .missing="Prefer not to answer/Missing")
 
 #CREATE BINARY Knower-level variable from ordinal measure in data file
 GiveN_subset$GN_sm_2cat <- factor(ifelse(GiveN_subset$GN_Small_Ceiling._FinalSet == 6, "CP-knower", "NOT CP-knower"), levels = c("NOT CP-knower", "CP-knower"))
@@ -77,54 +93,129 @@ GiveN_subset <-  dplyr::mutate(GiveN_subset, t10_corr = ifelse(is.na(GiveN_subse
 GiveN_subset <-  dplyr::mutate(GiveN_subset, t12_corr = ifelse(is.na(GiveN_subset$Target12_FinalSet_Correct.), GiveN_subset$Target12_1st_Response_Fish_Correct., GiveN_subset$Target12_FinalSet_Correct.))
 GiveN_subset <-  dplyr::mutate(GiveN_subset, t16_corr = ifelse(is.na(GiveN_subset$Target16_FinalSet_Correct.), GiveN_subset$Target16_1st_Response_Fish_Correct., GiveN_subset$Target16_FinalSet_Correct.))
 
+#Calculate mean proportion correct for Give-N trials 7, 9, 10, 12, & 16 (only for kids who got all five trials)
 
-#CALCULATE MEAN PROP CORR FOR GIVE-N LARGE (only for kids who got all five trials)
-
-# Code below will appropriately not calculate mean (puts "NA") if any trial from above columns has NA value--THIS IS CORRECT, bc doing a proportion correct out of different numbers of trials for different kids is a no-go
+# Code below will appropriately *not* calculate mean (puts "NA") if any trial from above columns has NA value--THIS IS CORRECT, bc doing a proportion correct out of different numbers of trials for different kids is a no-go
 GiveN_subset <-  GiveN_subset %>% rowwise() %>% dplyr::mutate(GN_Lg_propcorr_NA=mean(c(t7_corr, t9_corr, t10_corr, t12_corr, t16_corr)))
+```
 
+# Basic Demographics, Figures, and Tables
 
-#Count/prop. of kids who are CP/NON-CP knowers, by Timing
-table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Timing)
-prop.table(table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Timing))
+## Demographics Summary Tables
+*This block and next block used for generating info used in Table 1 and Table 3
+```{r}
+##Participant Demographics by Language Group
+table1::label(GiveN_subset$Age) <- "Age (years)"
+table1::label(GiveN_subset$Sex) <- "Sex"
+table1::label(GiveN_subset$Race_recoded) <- "Race"
+table1::label(GiveN_subset$Ethnicity_recoded) <- "Ethnicity"
+table1::label(GiveN_subset$SES..8.66.) <- "SES"
+table1::label(GiveN_subset$AgeofLangExp_years) <- "Age of Language Exposure (yrs)"
 
+##Demographics (four groups)
+table1::table1(~Age + Sex + Race_recoded + Ethnicity_recoded + SES..8.66. + AgeofLangExp_years | LanguageGroup, data = GiveN_subset, overall=F)
+
+##Demographics by Timing
+table1::table1(~Age + Sex + Race_recoded + Ethnicity_recoded + SES..8.66. + AgeofLangExp_years | Language_Timing, data = GiveN_subset, overall=F)
+
+##Demographics by Modality
+table1::table1(~Age + Sex + Race_recoded + Ethnicity_recoded + SES..8.66. + AgeofLangExp_years | Language_Modality, data = GiveN_subset, overall=F)
+```
+
+## Testing whether SES or Age differ by Language Modality or Language Timing
+```{r}
+as.numeric(GiveN_subset$Language_Timing)
+with(GiveN_subset, cor.test(SES..8.66., as.numeric(Language_Timing)))
+with(GiveN_subset, wilcox.test(SES..8.66. ~ Language_Timing))
+
+with(GiveN_subset, cor.test(Age, as.numeric(Language_Timing)))
+with(GiveN_subset, wilcox.test(Age ~ Language_Timing))
+
+as.numeric(GiveN_subset$Language_Modality)
+with(GiveN_subset, cor.test(SES..8.66., as.numeric(Language_Modality)))
+with(GiveN_subset, wilcox.test(SES..8.66. ~ Language_Modality))
+
+with(GiveN_subset, cor.test(Age, as.numeric(Language_Modality)))
+with(GiveN_subset, wilcox.test(Age ~ Language_Modality))
 ```
 
 
 
-## Beeswarn Boxplot for GN-2-category (CP-Knower vs. Non-CP-Knower) w/dot colors by Language Timing & Language Modality
-
+## Count & proportion of kids who are CP-Knowers and Non-CP-knowers, by Language Timing & Modality
 ```{r}
 summary(GiveN_subset$Language_Timing)
-table(GiveN_subset$Language_Timing, GiveN_subset$GN_sm_2cat, useNA = "always")
-jitter <- position_jitter(width=0, height=0.075)
-
-#N for code below is: summary() values - NA values from table()
-a <- ggplot(data=GiveN_subset, mapping = aes(x=GN_sm_2cat, y=Age)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=Language_Timing, color=Language_Timing), method = "dotdensity", binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=11), axis.title.x=element_blank(), legend.position = c(0.8, 0.2))  + ylab("Age (Years)") + scale_fill_manual(name = "Language\nTiming", breaks=c("Later", "Early"), values=c("firebrick3", "grey37"), labels=c("Later (83)", "Early (93)")) + scale_color_manual(name = "Language\nTiming", breaks=c("Later", "Early"), values=c("firebrick3", "grey37"), labels=c("Later (83)", "Early (93)"))
+table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Timing, useNA = "always")
+prop.table(table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Timing), margin=2) #proportions calculated summing across columns
 
 summary(GiveN_subset$Language_Modality)
-table(GiveN_subset$Language_Modality, GiveN_subset$GN_sm_2cat, useNA = "always")
-
-#N for code below is: summary() values - NA values from table()
-b <- ggplot(data=GiveN_subset, mapping = aes(x=GN_sm_2cat, y=Age)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=Language_Modality, color=Language_Modality), binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=10), axis.title.x=element_blank(), legend.position = c(0.8, 0.2))  + ylab("Age (Years)") + scale_fill_manual(name = "Language Modality", values=c("tan2", "forestgreen"), breaks=c("English", "ASL"), labels=c("English (105)", "ASL (71)")) + scale_color_manual(name = "Language Modality", values=c("tan2", "forestgreen"), breaks=c("English", "ASL"), labels=c("English (105)", "ASL (71)"))
-
-ggarrange(a, b, ncol=2, nrow=1, common.legend = FALSE)
+table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Modality, useNA = "always")
+prop.table(table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Modality), margin=2)#proportions calculated summing across columns
 ```
 
-## Figure 4 - SCATTERPLOTS of proportion correct values on GIVE-N Quantities 7, 9, 10, 12, 16 by Age (years), separated by Language Timing & Language Modality
+
+## Figure 2. Beeswarn Boxplot looking at CP-Knower vs. Non-CP-Knower w/dot colors by Language Timing & Language Modality
+
 ```{r}
-summary(GiveN_subset$Language_Timing)
-table(GiveN_subset$Language_Timing, GiveN_subset$GN_Lg_propcorr_NA, useNA = "always")
+jitter <- position_jitter(width=0, height=0.075) # Making overlapping points more visible
+
+#N in code below sums rows from table() functions output in previous block
+a <- ggplot(data=GiveN_subset, mapping = aes(x=Language_Timing, y=Age)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=GN_sm_2cat, color=GN_sm_2cat), method = "dotdensity", binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=11))  + xlab("Language Timing") + ylab("Age (Years)") +  scale_fill_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (50)", "CP-Knowers (126)")) + scale_color_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (50)", "CP-Knowers (126)"))
+
+
+#N for code below sums rows from table() functions output in previous block
+b <- ggplot(data=GiveN_subset, mapping = aes(x=Language_Modality, y=Age)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=GN_sm_2cat, color=GN_sm_2cat), binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=11))  + xlab("Language Modality") + ylab("Age (Years)") +    scale_fill_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (50)", "CP-Knowers (126)")) + scale_color_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (50)", "CP-Knowers (126)"))
+ggarrange(a, b, ncol=2, nrow=1, common.legend = TRUE, labels="auto")
+
+```
+
+## Looking at only Early Language groups: graphs & Chi-square comparison
+```{r}
+#Create dataframe with only early-exposed
+GN_early <- subset(GiveN_subset, GiveN_subset$Language_Timing=="Early")
+
+#table of CP-knower status vs group (modality)
+table(GN_early$GN_sm_2cat, GN_early$Language_Modality)
+prop.table(table(GN_early$GN_sm_2cat, GN_early$Language_Modality), margin=2) #proportions calculated summing across columns
+```
+<br>
+
+*Chi-square test indicates that CP-Knower achievement does not differ by Language Modality* 
+
+
+## Figure 3. Ages of CP-Knower Achievement by Language Modality for Early Language Groups
+```{r}
+s#graph of CP-knower status by Age & Language Modality (Early-exposed only)
+ggplot(data=GN_early, mapping = aes(x=Language_Modality, y=Age)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=GN_sm_2cat, color=GN_sm_2cat), binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=11), legend.position = c(0.14, 0.87))  + xlab("Early Language Group") + ylab("Age (Years)") +    scale_fill_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (23)", "CP-Knowers (70)")) + scale_color_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (23)", "CP-Knowers (70)"))
+
+chisq.test(table(GN_early$GN_sm_2cat, GN_early$Language_Modality))
+```
+
+
+
+## Figure 4.  Scatterplots of proportion correct values on Give-N Quantities 7, 9, 10, 12, 16 by Age (years), separated by Language Timing & Language Modality
+```{r}
+# Create the data frame that will be used for Give-N Large analyses 
+# This removes missing ("NA") values, and removes participants who were tested on Give-N higher quantities but who were not CP-knowers as determined by their performance on Give-N quantities 1-6
+GN_lg_noNA <- subset(GiveN_subset, GiveN_subset$GN_Lg_propcorr_NA!='' & GiveN_subset$GN_sm_2cat!="NOT CP-knower")
+
+# Turn the proportion correct variable into a factor so it can be used in the ordinal model
+GN_lg_noNA$GN_lg_factor <- as.factor(as.character(GN_lg_noNA$GN_Lg_propcorr_NA))
+
+
+summary(GN_lg_noNA$Language_Timing)
+table(GN_lg_noNA$Language_Timing, GN_lg_noNA$GN_Lg_propcorr_NA, useNA = "always")
 
 #N for code below is: summary() values - NA values from table()
-ggplot(data=GiveN_subset, aes(x=Age, y=GN_Lg_propcorr_NA, shape=Language_Timing, color=Language_Timing)) + geom_jitter(na.rm=TRUE) + geom_smooth(method=lm, se = FALSE) + labs(x="Age at Test (Years)", y="Give-N Large Proportion Correct") + theme(plot.title = element_text(hjust = 0.5)) + scale_shape_manual(name="Language\nTiming", values=c(17, 16), labels=c("Later (75)", "Early (60)")) + scale_color_manual(name="Language\nTiming", values=c("firebrick3", "deepskyblue3"), labels=c("Later (75)", "Early (60)"))
+GNlg_Timing <- ggplot(data=GN_lg_noNA, aes(x=Age, y=GN_Lg_propcorr_NA, shape=Language_Timing, color=Language_Timing)) + geom_jitter(na.rm=TRUE) + geom_smooth(method=lm, se = FALSE) + scale_y_continuous(breaks = seq(0, 1, by = 0.2), limits=c(0,1)) + labs(x="Age at Test (Years)", y="Give-N Large Proportion Correct") + theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.82, 0.15)) + scale_shape_manual(name="Language\nTiming", values=c(17, 16), labels=c("Early (68)", "Later (48)")) + scale_color_manual(name="Language\nTiming", values=c("deepskyblue3", "firebrick3"), labels=c("Early (68)", "Later (48)"))
 
-
-summary(GiveN_subset$Language_Modality)
-table(GiveN_subset$Language_Modality, GiveN_subset$GN_Lg_propcorr_NA, useNA = "always")
+summary(GN_lg_noNA$Language_Modality)
+table(GN_lg_noNA$Language_Modality, GN_lg_noNA$GN_Lg_propcorr_NA, useNA = "always")
 
 #N for code below is: summary() values - NA values from table()
-ggplot(data=GiveN_subset, aes(x=Age, y=GN_Lg_propcorr_NA, shape=Language_Modality, color=Language_Modality)) + geom_jitter(na.rm=TRUE) + geom_smooth(method=lm, se = FALSE) + labs(x="Age at Test (Years)", y="Give-N Large Proportion Correct") + theme(plot.title = element_text(hjust = 0.5)) + scale_color_manual(name = "Language\nModality", values=c("tan2", "forestgreen"), labels=c("English (87)", "ASL (48)")) + scale_shape_manual(name = "Language\nModality", values=c(19, 15),  labels=c("English (87)", "ASL (48)"))
+GNlg_Modality <- ggplot(data=GN_lg_noNA, aes(x=Age, y=GN_Lg_propcorr_NA, shape=Language_Modality, color=Language_Modality)) + geom_jitter(na.rm=TRUE) + geom_smooth(method=lm, se = FALSE) +  scale_y_continuous(breaks = seq(0, 1, by = 0.2), limits=c(0,1)) + labs(x="Age at Test (Years)", y="Give-N Large Proportion Correct") + theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.81, 0.15)) + scale_color_manual(name = "Language\nModality", values=c("slategray4", "purple3"), labels=c("English (73)", "ASL (43)")) + scale_shape_manual(name = "Language\nModality", values=c(19, 15),  labels=c("English (73)", "ASL (43)"))
+
+ggarrange(GNlg_Timing, GNlg_Modality, ncol=2, nrow=1, common.legend = FALSE, labels="auto")
+
 ```
 
 
@@ -133,27 +224,20 @@ ggplot(data=GiveN_subset, aes(x=Age, y=GN_Lg_propcorr_NA, shape=Language_Modalit
 
 
 
-## THE MODELS 
+# THE MODELS 
 
-### Give-N Quantities 1-6, Split into 2 Categories (CP-knowers and Non-CP-knowers) - LOGISTIC REGRESSION
-
+### Logistic Regression Predicting CP-Knower Status (CP-knower vs. Non-CP-knower) using data from Give-N Quantities 1-6 (Table 2)
 ```{r}
 null <-glm(formula = GN_sm_2cat ~ 1, data = GiveN_subset, family = "binomial")
 summary(null) #resid dev: 210.07   AIC 212.07
 j <- glm(formula = GN_sm_2cat ~ SES..8.66. + Language_Modality + Age + Language_Timing, data = GiveN_subset, family = "binomial")
-summary(j) #resid dev: 162.72   AIC 172.72 ##Age & Timing sig., Modality & SES not.
+summary(j) # Age & Timing sig., Modality & SES not.
 
 exp(coef(j)) #ODDS RATIOS
 	#Kids in the early exposed group are 2.23 times more likely to have achieved CP-knower status than kids in the later group
-
-# Same regression as above, with age x Timing interaction instead of additive effects
-##    k <- glm(formula = GN_sm_2cat ~ SES + Modality + Age*Timing, data = GiveN_subset, family = "binomial")
-##    summary(k) #resid dev: 159.75   AIC 171.75
-# Timing * Age interaction not sig (but neither is anything else except age)
 ```
 
-## MODEL FIT MEASURES
-
+## Logistic Regression fit test
 ```{r}
 with(j, null.deviance - deviance)
 with(j, df.null - df.residual)
@@ -161,26 +245,48 @@ with(j, pchisq(null.deviance - deviance, df.null - df.residual, lower.tail = FAL
 #Model fits sig. better than a null model, p<.001
 ```
 
+## Testing other possible models
+```{r}
+# Checking for an interaction between Age and Language Timing
+k <- glm(formula = GN_sm_2cat ~ SES..8.66. + Language_Modality + Age*Language_Timing, data = GiveN_subset, family = "binomial")
+summary(k) #resid dev: 159.75   AIC 171.75  # Age only significant predictor
+lmtest::lrtest(j, k) # model with Age * Timing interaction not significantly different from model without the interaction
+
+h <- glm(formula = GN_sm_2cat ~ Language_Modality + Age + Language_Timing, data = GiveN_subset, family = "binomial") #model without SES
+summary(h)  # residual deviance: 165.98  AIC: 173.98
+lmtest::lrtest(j, h) # model without SES not significantly different from model with SES
+
+p <- glm(formula = GN_sm_2cat ~ SES..8.66. + Age + Language_Timing, data = GiveN_subset, family = "binomial") #model without Language Modality
+summary(h)  # residual deviance: 165.98  AIC: 173.98
+lmtest::lrtest(j, p) # model without Language Modality not significantly different from model with Language Modality
+
+w <- glm(formula = GN_sm_2cat ~ SES..8.66.+ Language_Modality + Age, data = GiveN_subset, family = "binomial") #model without Language Timing
+summary(w) # residual deviance: 166.75  AIC: 174.75
+lmtest::lrtest(j, w) # model without Language Timing IS significantly different from model with Language Timing; Looking at AIC and residual deviance, the model WITH Language Timing fits the data better
+
+```
 
 
-## MODEL DIAGNOSTICS
+## Logistic Regression model diagnostics (for best-fitting model)
 
 ```{r}
 # from http://www.sthda.com/english/articles/36-classification-methods-essentials/148-logistic-regression-assumptions-and-diagnostics-in-r/
 
-#Step 1: checking that continuous predictros ARE in fact linearly associated with logit of the outcome
+#Step 1: checking that continuous predictors ARE in fact linearly associated with logit of the outcome
 
 # Select only numeric predictors
 continuous_pred <- GiveN_subset %>%
-  dplyr::select(c("Age", "SES..8.66.")) 
+  dplyr::select(c(Age, SES..8.66.)) 
 predictors <- colnames(continuous_pred)
 
 #get the predicted probabilities for EACH KID in the whole model (based on their specific values of each predictor)
-probabilities <- predict(j, type = "response")
+continuous_pred$probabilities <- predict(j, newdata=GiveN_subset, type = "response")
 
-# Bind the logit and tidying the data for plot
-continuous_pred <- continuous_pred %>%
-  mutate(logit = log(probabilities/(1-probabilities))) %>%
+# Bind the logit and tidy the data for plot
+#mutated_probs <- mutate(logit = logitlink(probabilities))
+
+continuous_pred %>%
+  mutate(logit = log(probabilities/1-probabilities)) %>%
   gather(key = "predictors", value = "predictor.value", -logit)
 
 #scatterplots!
@@ -217,30 +323,30 @@ car::vif(j)  ##None! (bc values not >5 or 10)
 # WOHOOO WE HAVE A GOOD MODEL, FOLKS!
 
 #output model
-stargazer(j, title = "Logistic Regression Results", align=TRUE, dep.var.labels=c("CP-Knower Status"), covariate.labels=c("Socioeconomic Status (SES)", "Language Modality (ASL)", "Age (Years)", "Timing of Language Exposure (Early)"), single.row=TRUE, keep.stat=c("n", "aic"),  out= "GN_CPknowerbinary_SES_Modality_Age_Timing_200514.htm")
+stargazer(j, title = "Logistic Regression Results", align=TRUE, dep.var.labels=c("CP-Knower Status"), covariate.labels=c("Socioeconomic Status (SES)", "Language Modality (ASL)", "Age (Years)", "Timing of Language Exposure (Early)"), single.row=TRUE, keep.stat=c("n", "aic"),  out= "GN_CPknowerbinary_SES_Modality_Age_Timing_220208.htm")
 ```
 
 
 
-## GIVE-N QUANTITIES 7, 9, 10, 12, 16
-Both linear and tobit models had poor measures of model fit and poor residual plots, so using an ordinal model
 
 
-### ORDINAL MODEL
+## Ordinal Logistic Regression for Give-N quantities 7, 9, 10, 12, 16
+Both linear and tobit models had poor measures of model fit and poor residual plots, so using an ordinal model with proportion correct (0, 0.2, 0.4, 0.6, 0.8, or 1.0) as the dependent variable
 
 ```{r}
-GN_lg_noNA <- subset(GiveN_subset, GiveN_subset$GN_Lg_propcorr_NA!='')
-View(GN_lg_noNA)
-
+# Turn the proportion correct variable into a factor so it can be used in the ordinal model (same code as above)
 GN_lg_noNA$GN_lg_factor <- as.factor(as.character(GN_lg_noNA$GN_Lg_propcorr_NA))
-GN_lg_noNA$GN_lg_factor
 
+# Base model
 GN_lg_null <- polr(formula = GN_lg_factor ~ 1, data = GN_lg_noNA,  method = "probit", Hess = TRUE) 
-summary(GN_lg_null) #res dev. 410.7124  AIC: 420.7124
+summary(GN_lg_null) #res dev. 305  AIC: 315
 
+# Model with predictors
 GN_lg_polr <- polr(formula = GN_lg_factor ~ SES..8.66. + Language_Modality + Age + Language_Timing, data = GN_lg_noNA,  method = "probit", Hess = TRUE) 
-summary(GN_lg_polr)  # res dev 337.9581   AIC: 355.9581
+summary(GN_lg_polr)  # res dev 265   AIC: 283
 
+tidy(GN_lg_polr, conf.int = TRUE, p.value=TRUE)
+dropterm(GN_lg_polr)
 
 lipsitz.test(GN_lg_polr) #ns
 logitgof(GN_lg_noNA$GN_lg_factor, fitted(GN_lg_polr)) #ns
@@ -264,6 +370,16 @@ grid.arrange(p1, p2,p3, p4, p5, p6, ncol = 3)  # code that produces Figure 2 in 
 
 ## Good fitting model!
 
-stargazer(GN_lg_polr, title = "Ordinal Logistic Regression Results", align=TRUE, dep.var.labels=c("Give-N Large Proportion Correct"), covariate.labels=c("Socioeconomic Status (SES)", "Language Modality (ASL)", "Age (Years)", "Timing of Language Exposure (Later)"), single.row=TRUE, keep.stat=c("n", "aic"),  out= "GN_lgordinal_SES_Modality_Age_Timing_probit_200514.htm")
+stargazer(GN_lg_polr, title = "Ordinal Logistic Regression Results", align=TRUE, dep.var.labels=c("Give-N Large Proportion Correct"), covariate.labels=c("Socioeconomic Status (SES)", "Language Modality (ASL)", "Age (Years)", "Timing of Language Exposure (Later)"), single.row=TRUE, keep.stat=c("n", "aic"),  out= "GN_lgordinal_SES_Modality_Age_Timing_probit_220208.htm")
 ```
 
+
+## Code for Tables/Figures in Supplementary materials
+```{r}
+summary(GN_lg_noNA$LanguageGroup)
+table(GN_lg_noNA$LanguageGroup, GN_lg_noNA$GN_Lg_propcorr_NA, useNA = "always")
+
+#N for code below is: summary() values - NA values from table()
+GNlg_4Grp <- ggplot(data=GN_lg_noNA, aes(x=GN_lg_factor, y=Age, color=LanguageGroup)) + geom_violin(na.rm=TRUE) + labs(x="Age at Test (Years)", y="Give-N Large Proportion Correct") + theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.15, 0.81))
+GNlg_4Grp
+```
