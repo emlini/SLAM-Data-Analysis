@@ -1,16 +1,19 @@
 ## TO DOs for Give-N paper
 
-11/30/2021
+2/8/22
 
-* Label code for Figs 1-3 in "Give-N Timing and Modality Analyses"" Rmd file
-* Adjust code for Fig. 4 so axes are standard
-* Add table like in BRIEF analyses with language experience info for each group (borrow code from BRIEF Rmd file)
-    * DO WE HAVE THIS IN THE GIVE-N SPREADSHEET??
-* Do an analysis of how far off kids are in quantity they give (absolute value) 
+* Label code for Figs 1-3 in "Give-N Timing and Modality Analyses"" Rmd file - DONE
+
+* Adjust code for Fig. 4 so axes are standard - DONE
+
+* Explore Later-exposed kids to see whether more fine-grained age of language exposure measure can tell us something about CP-knower status - DONE
+
+* Do an analysis of how far off kids are in quantity they give (absolute value) FOR LARGER QUANTITIES 
+    * Calculate difference score (how far off are kids when they get it wrong, and above or below)
     * Maybe a plot like in Spaepen et al (Requested vs Given) and calculate R^2 value, separated by Timing
     * Are early-exposed kids more on-target than Later-exposed kids
-<<<<<<< HEAD
-* Add Coding & Analysis sub-section to Methods, and make Results match this (for Give-N Small and Give-N Large)
+
+
+
+
 =======
-* Add Coding & Analysis sub-section to Methods, and make Results match this
->>>>>>> 6cd02fc48c5e35836656c5b66667aa1627c4aa53

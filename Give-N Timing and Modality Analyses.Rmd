@@ -21,8 +21,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Code last edited February 8 2022 (as part of response to Reviewers)
 
-#Load required packages
-```{r echo=TRUE, results='hide'}
+# Load required packages
+```{r results='hide', warning=FALSE, message=FALSE}
 library(tidyverse) 
 library(ggplot2)
 library(colorspace)
@@ -102,7 +102,7 @@ GiveN_subset <-  GiveN_subset %>% rowwise() %>% dplyr::mutate(GN_Lg_propcorr_NA=
 # Basic Demographics, Figures, and Tables
 
 ## Demographics Summary Tables
-*This block and next block used for generating info used in Table 1 and Table 3
+*This block and next block used for generating info used in Table 1 and Table 3*
 ```{r}
 ##Participant Demographics by Language Group
 table1::label(GiveN_subset$Age) <- "Age (years)"
@@ -152,10 +152,28 @@ table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Modality, useNA = "always")
 prop.table(table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Modality), margin=2)#proportions calculated summing across columns
 ```
 
+### Later-Exposed Participants Only: CP-Knower status on Age of Language 
+```{r}
+GiveN_later <- subset(GiveN_subset, Language_Timing=="Later")
+View(GiveN_later)
+GiveN_later <- dplyr::mutate(GiveN_later, AoLE_2cat = case_when(AgeofLangExp_years <= 1 ~ "Language Exposure before Age 1", 
+                               AgeofLangExp_years > 1 ~ "Language Exposure after Age 1"))
+table(GiveN_later$GN_sm_2cat, GiveN_later$AoLE_2cat, useNA = "always")
+prop.table(table(GiveN_later$GN_sm_2cat, GiveN_later$AoLE_2cat), margin=2) #proportions calculated summing across columns
+
+GiveN_later <- dplyr::mutate(GiveN_later, AoLE_bins = cut(Age.of.Exposure..mo., breaks = c(0, 12, 24, 36, 48,70)))
+table(GiveN_later$GN_sm_2cat, GiveN_later$AoLE_bins, useNA = "always")
+prop.table(table(GiveN_later$GN_sm_2cat, GiveN_later$AoLE_bins), margin=2) #proportions calculated summing across columns
+
+
+ggplot(data=GiveN_later, mapping = aes(x=Language_Modality, y=Age.of.Exposure..mo.)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=GN_sm_2cat, color=GN_sm_2cat), method = "dotdensity", binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=11))  + xlab("Language Modality") + ylab("Age of Language Exposure (Months)") +  scale_fill_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (n)", "CP-Knowers (n)")) + scale_color_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (n)", "CP-Knowers (n)"))
+
+
+```
 
 ## Figure 2. Beeswarn Boxplot looking at CP-Knower vs. Non-CP-Knower w/dot colors by Language Timing & Language Modality
 
-```{r}
+```{r, warning=FALSE}
 jitter <- position_jitter(width=0, height=0.075) # Making overlapping points more visible
 
 #N in code below sums rows from table() functions output in previous block
@@ -224,9 +242,9 @@ ggarrange(GNlg_Timing, GNlg_Modality, ncol=2, nrow=1, common.legend = FALSE, lab
 
 
 
-# THE MODELS 
+# The Models
 
-### Logistic Regression Predicting CP-Knower Status (CP-knower vs. Non-CP-knower) using data from Give-N Quantities 1-6 (Table 2)
+## Logistic Regression Predicting CP-Knower Status (CP-knower vs. Non-CP-knower) using data from Give-N Quantities 1-6 (Table 2)
 ```{r}
 null <-glm(formula = GN_sm_2cat ~ 1, data = GiveN_subset, family = "binomial")
 summary(null) #resid dev: 210.07   AIC 212.07
@@ -280,14 +298,14 @@ continuous_pred <- GiveN_subset %>%
 predictors <- colnames(continuous_pred)
 
 #get the predicted probabilities for EACH KID in the whole model (based on their specific values of each predictor)
-continuous_pred$probabilities <- predict(j, newdata=GiveN_subset, type = "response")
+continuous_pred$probabilities <- predict(j, type = "response")
 
 # Bind the logit and tidy the data for plot
-#mutated_probs <- mutate(logit = logitlink(probabilities))
+continuous_pred <- continuous_pred %>%
+  mutate(logit = log(probabilities/(1-probabilities))) %>%
+ pivot_longer(-logit, names_to = "predictors", values_to = "predictor.value")
 
-continuous_pred %>%
-  mutate(logit = log(probabilities/1-probabilities)) %>%
-  gather(key = "predictors", value = "predictor.value", -logit)
+
 
 #scatterplots!
 ggplot(continuous_pred, aes(logit, predictor.value))+
@@ -355,16 +373,16 @@ pulkrob.chisq(GN_lg_polr, c("Language_Modality", "Language_Timing")) #ns
 
 
 
-## checking RESIDUALS
+## Checking surrogate residuals
 ```{r}
 sres <- resids(GN_lg_polr)
 
-p1 <- autoplot(sres, what = "qq", distribution = qnorm)
-p2 <- autoplot(sres, what = "covariate", x = GN_lg_noNA$SES..8.66., xlab = "SES") #bit of bunching at higher values but we know SES is skewed (also not variable of interest in this model)
-p3 <- autoplot(sres, what = "covariate", x = GN_lg_noNA$Language_Modality, xlab = "Language Modality") #good
-p4 <- autoplot(sres, what = "covariate", x = GN_lg_noNA$Age, xlab = "Age") #good
-p5 <- autoplot(sres, what = "covariate", x = GN_lg_noNA$Language_Timing, xlab = "Language Timing") #good
-p6 <- autoplot(sres, what = "covariate", x = GN_lg_noNA$GN_lg_factor, xlab = "Large Number Knowledge") # shows that surrogate residuals underestimated for lower values of Give-N large prop corr (0, 0.2, 0.4, 0.6) and overestimated for  (not sure how much to make of this)
+p1 <- autoplot.resid(sres, what = "qq", distribution = qnorm)
+p2 <- autoplot.resid(sres, what = "covariate", x = GN_lg_noNA$SES..8.66., xlab = "SES") #bit of bunching at higher values but we know SES is skewed (also not variable of interest in this model)
+p3 <- autoplot.resid(sres, what = "covariate", x = GN_lg_noNA$Language_Modality, xlab = "Language Modality") #good
+p4 <- autoplot.resid(sres, what = "covariate", x = GN_lg_noNA$Age, xlab = "Age") #good
+p5 <- autoplot.resid(sres, what = "covariate", x = GN_lg_noNA$Language_Timing, xlab = "Language Timing") #good
+p6 <- autoplot.resid(sres, what = "covariate", x = GN_lg_noNA$GN_lg_factor, xlab = "Large Number Knowledge") # shows that surrogate residuals underestimated for lower values of Give-N large prop corr (0, 0.2, 0.4, 0.6) and overestimated for  (not sure how much to make of this)
 grid.arrange(p1, p2,p3, p4, p5, p6, ncol = 3)  # code that produces Figure 2 in Greenwell et al ppr
 
 
@@ -374,12 +392,74 @@ stargazer(GN_lg_polr, title = "Ordinal Logistic Regression Results", align=TRUE,
 ```
 
 
-## Code for Tables/Figures in Supplementary materials
+# Analysis of how far off kids are on Give-N Quantities 7, 9, 10, 12, 16 and whether that differs by Language Timing or Modality
+```{r}
+# Calculate difference score for Give-N Quantities 7.9. 10
+GN_lg_diff <- subset(GN_lg_noNA, GN_Lg_propcorr_NA != 1.0)
+
+View(GN_lg_diff)
+summary(GN_lg_diff$GN_Lg_propcorr_NA)
+table(GN_lg_diff$GN_Lg_propcorr_NA) #
+
+with(GN_lg_diff, (table(Target7_FinalSet_Correct., Target9_FinalSet_Correct., Target10_FinalSet_Correct., Target12_FinalSet_Correct., Target16_FinalSet_Correct.))) #
+
+##Participant Demographics by Language Group
+table1::label(GN_lg_diff$Target7_FinalSet_Correct.) <- "Target 7 Correct?"
+table1::label(GN_lg_diff$Target9_FinalSet_Correct.) <- "Target 9 Correct?"
+table1::label(GN_lg_diff$Target10_FinalSet_Correct.) <- "Target 10 Correct?"
+table1::label(GN_lg_diff$Target12_FinalSet_Correct.) <- "Target 12 Correct?"
+table1::label(GN_lg_diff$Target16_FinalSet_Correct.) <- "Target 16 Correct?"
+
+##Pattern of responses for kids who didn't get 100% on all trials 
+table1::table1(~Target7_FinalSet_Correct. + Target9_FinalSet_Correct. + Target10_FinalSet_Correct. + Target12_FinalSet_Correct. + Target16_FinalSet_Correct., data = GN_lg_diff, overall=T)
+
+table1::table1(~Target7_FinalSet_Correct. + Target9_FinalSet_Correct. + Target10_FinalSet_Correct. + Target12_FinalSet_Correct. + Target16_FinalSet_Correct. | Language_Timing, data = GN_lg_diff, overall=T)
+
+table1::table1(~Target7_FinalSet_Correct. + Target9_FinalSet_Correct. + Target10_FinalSet_Correct. + Target12_FinalSet_Correct. + Target16_FinalSet_Correct. | Language_Modality, data = GN_lg_diff, overall=T)
+
+table1::table1(~Target7_FinalSet_Correct. + Target9_FinalSet_Correct. + Target10_FinalSet_Correct. + Target12_FinalSet_Correct. + Target16_FinalSet_Correct. | LanguageGroup, data = GN_lg_diff, overall=T)
+
+
+
+
+GN_lg_diff <- dplyr::mutate(GN_lg_diff, GN_diff_7 = if_else(Target7_FinalSet_Correct.==0, (Target7_1st_Response_Fish - Target7), as.integer(0)), 
+         GN_diff_9 = if_else(Target9_FinalSet_Correct.==0, (Target9_1st_Response_Fish - Target9), as.integer(0)),
+         GN_diff_10 = if_else(Target10_FinalSet_Correct.==0, (Target10_1st_Response_Fish - Target10), as.integer(0)),
+         GN_diff_12 = if_else(Target12_FinalSet_Correct.==0, (Target12_1st_Response_Fish - Target12), as.integer(0)),
+         GN_diff_16 = if_else(Target16_FinalSet_Correct.==0, (Target16_1st_Response_Fish - Target16), as.integer(0)))
+
+View(GN_lg_diff)
+
+
+summary(GN_lg_diff$GN_diff_7)
+summary(GN_lg_diff$GN_diff_9)
+summary(GN_lg_diff$GN_diff_10)
+summary(GN_lg_diff$GN_diff_12)
+summary(GN_lg_diff$GN_diff_16)
+
+table(GN_lg_diff$GN_diff_7)
+table(GN_lg_diff$GN_diff_9)
+table(GN_lg_diff$GN_diff_10)
+table(GN_lg_diff$GN_diff_12)
+table(GN_lg_diff$GN_diff_16)
+
+
+# If diff column = 0, means they were correct, otherwise look at magnitute and whether positive or negative
+
+# NEED SUMMARY TABLES/FIGURES
+
+```
+
+
+
+# Code for Tables/Figures in Supplementary materials
+
+## Figure ?. Proportion Correct on Give-N Quantities 7, 9, 10, 12, 16 by Group (4-way split)
 ```{r}
 summary(GN_lg_noNA$LanguageGroup)
 table(GN_lg_noNA$LanguageGroup, GN_lg_noNA$GN_Lg_propcorr_NA, useNA = "always")
 
 #N for code below is: summary() values - NA values from table()
-GNlg_4Grp <- ggplot(data=GN_lg_noNA, aes(x=GN_lg_factor, y=Age, color=LanguageGroup)) + geom_violin(na.rm=TRUE) + labs(x="Age at Test (Years)", y="Give-N Large Proportion Correct") + theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.15, 0.81))
+GNlg_4Grp <- ggplot(data=GN_lg_noNA, aes(x=GN_lg_factor, y=Age, color=LanguageGroup)) + geom_violin(na.rm=TRUE) + labs(x="Give-N Large Proportion Correct", y="Age at Test (Years)") + theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.15, 0.81))
 GNlg_4Grp
 ```
