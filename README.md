@@ -1,5 +1,3 @@
-THIS REPOSITORY IS DEFUNCT AS OF JAN 18 2021 - see new SLaM Analyses Repositoy for updated code
-
 # SLAM-Data-Analysis
 
 Analysis files for SLAM project--details about the project can be found here: https://slam.uconn.edu
@@ -11,7 +9,8 @@ Analysis files for SLAM project--details about the project can be found here: ht
   - Give-N (Give a number task, measure of number cognition, specifically exact quantity representation)
   - PPVT (Peabody Picture Vocabulary Task, general measure of language--VOCAB)
   - Panamath (computer program/game allowing estimation of approximate number system--AKA analogue magnitude system)
-  - OTHERS (coming soon)
+  - BRIEF/BRIEF-Preschool (parental report of executive function-related skills; see [this repository](https://github.com/emlini/SLaM_BRIEF_analyses) for analyses related to this)
+  - OTHERS (to be added)
 
 **PARTICIPANT DATA:**
   - Age at Test
