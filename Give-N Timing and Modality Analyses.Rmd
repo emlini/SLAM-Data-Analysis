@@ -19,7 +19,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Code last edited February 8 2022 (as part of response to Reviewers)
+Code last edited March 8 2022 (as part of response to Reviewers)
 
 # Load required packages
 ```{r results='hide', warning=FALSE, message=FALSE}
@@ -152,7 +152,7 @@ table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Modality, useNA = "always")
 prop.table(table(GiveN_subset$GN_sm_2cat, GiveN_subset$Language_Modality), margin=2)#proportions calculated summing across columns
 ```
 
-### Later-Exposed Participants Only: CP-Knower status on Age of Language 
+### Later-Exposed Participants Only: CP-Knower status by Age of Language Exposure
 ```{r}
 GiveN_later <- subset(GiveN_subset, Language_Timing=="Later")
 View(GiveN_later)
@@ -161,13 +161,15 @@ GiveN_later <- dplyr::mutate(GiveN_later, AoLE_2cat = case_when(AgeofLangExp_yea
 table(GiveN_later$GN_sm_2cat, GiveN_later$AoLE_2cat, useNA = "always")
 prop.table(table(GiveN_later$GN_sm_2cat, GiveN_later$AoLE_2cat), margin=2) #proportions calculated summing across columns
 
+wilcox.test(GiveN_later$AgeofLangExp_years~GiveN_later$Language_Modality)
+
 GiveN_later <- dplyr::mutate(GiveN_later, AoLE_bins = cut(Age.of.Exposure..mo., breaks = c(0, 12, 24, 36, 48,70)))
 table(GiveN_later$GN_sm_2cat, GiveN_later$AoLE_bins, useNA = "always")
 prop.table(table(GiveN_later$GN_sm_2cat, GiveN_later$AoLE_bins), margin=2) #proportions calculated summing across columns
 
 
+#Boxplot Beeswarm of Modality by Age separated by CP-knower-level for later-exposed only
 ggplot(data=GiveN_later, mapping = aes(x=Language_Modality, y=Age.of.Exposure..mo.)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=GN_sm_2cat, color=GN_sm_2cat), method = "dotdensity", binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=11))  + xlab("Language Modality") + ylab("Age of Language Exposure (Months)") +  scale_fill_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (n)", "CP-Knowers (n)")) + scale_color_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (n)", "CP-Knowers (n)"))
-
 
 ```
 
@@ -202,7 +204,7 @@ prop.table(table(GN_early$GN_sm_2cat, GN_early$Language_Modality), margin=2) #pr
 
 ## Figure 3. Ages of CP-Knower Achievement by Language Modality for Early Language Groups
 ```{r}
-s#graph of CP-knower status by Age & Language Modality (Early-exposed only)
+#graph of CP-knower status by Age & Language Modality (Early-exposed only)
 ggplot(data=GN_early, mapping = aes(x=Language_Modality, y=Age)) + geom_boxplot() + geom_dotplot(mapping=aes(fill=GN_sm_2cat, color=GN_sm_2cat), binaxis = "y", position = jitter, stackdir = "center", dotsize=0.5, stackratio = 1.25) + theme(text = element_text(size=11), legend.position = c(0.14, 0.87))  + xlab("Early Language Group") + ylab("Age (Years)") +    scale_fill_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (23)", "CP-Knowers (70)")) + scale_color_manual(name = "CP-Knower Status", values=c("tan2", "springgreen3"), labels=c("Non-CP-Knowers (23)", "CP-Knowers (70)"))
 
 chisq.test(table(GN_early$GN_sm_2cat, GN_early$Language_Modality))
@@ -443,13 +445,24 @@ table(GN_lg_diff$GN_diff_10)
 table(GN_lg_diff$GN_diff_12)
 table(GN_lg_diff$GN_diff_16)
 
+table(GN_lg_diff$GN_diff_7, GN_lg_diff$Language_Timing)
+table(GN_lg_diff$GN_diff_9, GN_lg_diff$Language_Timing)
+table(GN_lg_diff$GN_diff_10, GN_lg_diff$Language_Timing)
+table(GN_lg_diff$GN_diff_12, GN_lg_diff$Language_Timing)
+table(GN_lg_diff$GN_diff_16, GN_lg_diff$Language_Timing)
+
+table(GN_lg_diff$GN_diff_7, GN_lg_diff$Language_Modality)
+table(GN_lg_diff$GN_diff_9, GN_lg_diff$Language_Modality)
+table(GN_lg_diff$GN_diff_10, GN_lg_diff$Language_Modality)
+table(GN_lg_diff$GN_diff_12, GN_lg_diff$Language_Modality)
+table(GN_lg_diff$GN_diff_16, GN_lg_diff$Language_Modality)
+
 
 # If diff column = 0, means they were correct, otherwise look at magnitute and whether positive or negative
 
 # NEED SUMMARY TABLES/FIGURES
 
 ```
-
 
 
 # Code for Tables/Figures in Supplementary materials
